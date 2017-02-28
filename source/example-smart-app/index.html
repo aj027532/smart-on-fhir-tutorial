@@ -1,88 +1,231 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta http-equiv='X-UA-Compatible' content='IE=edge' />
-    <meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
-    <title>aj027532 Example-SMART-App</title>
+<head>
+  <style type="text/css">
 
-    <link rel='stylesheet' type='text/css' href='./src/css/example-smart-app.css'>
-  </head>
-  <body>
-    <div id='errors'>
-    </div>
-    <div id="loading" class="spinner">
-      <div class="bounce1"></div>
-      <div class="bounce2"></div>
-      <div class="bounce3"></div>
-    </div>
-    <div id='holder' >
-      <h2>Example-SMART-App</h2>
+    body {
+      font-family: arial;
+    }
 
-      <h2>Patient Resource</h2>
-      <table>
-        <tr>
-          <th>First Name:</th>
-          <td id='fname'></td>
-        </tr>
-        <tr>
-          <th>Last Name:</th>
-          <td id='lname'></td>
-        </tr>
-        <tr>
-          <th>Gender:</th>
-          <td id='gender'></td>
-        </tr>
-        <tr>
-          <th>Date of Birth:</th>
-          <td id='birthdate'></td>
-        </tr>
-        <tr>
-          <th>Age:</th>
-          <td id='age'></td>
-        </tr>
-      </table>
-      <h2>Observation Resource</h2>
-      <table>
-        <tr>
-          <th>Height:</th>
-          <td id='height'></td>
-        </tr>
-        <tr>
-          <th>Systolic Blood Pressure:</th>
-          <td id='systolicbp'></td>
+    .search {
+      background-color: #fafafa;
+      border: 1px solid #cccccc;
+      border-radius: 4px;
+      margin: 4px;
+      padding: 4px;
+    }
 
-        </tr>
-        <tr>
-          <th>Diastolic Blood Pressure:</th>
-          <td id='diastolicbp'></td>
-        </tr>
-        <tr>
-          <th>LDL:</th>
-          <td id='ldl'></td>
-        </tr>
-        <tr>
-          <th>HDL:</th>
-          <td id='hdl'></td>
-        </tr>
-      </table>
-    </div>
-    <script src='./lib/es6-shim-0.35.1.min.js'></script>
-    <script src='./src/js/example-smart-app.js'></script>
-    <script src='./lib/fhir-client.js'></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-    <script>
-      extractData().then(
-        //Display Patient Demographics and Observations if extractData was success
-        function(p) {
-          drawVisualization(p);
-        },
+    .shortcuts {
+      background-color: #fafafa;
+      border: 1px solid #cccccc;
+      border-radius: 4px;
+      display: inline-block;
+      margin: 4px;
+      padding: 4px;
+    }
 
-        //Display 'Failed to call FHIR Service' if extractData failed
-        function() {
-          $('#loading').hide();
-          $('#errors').html('<p> Failed to call FHIR Service </p>');
-        }
-      );
-    </script>
-  </body>
+  </style>
+  <script data-require="jquery@*" data-semver="2.0.3" src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+</head>
+<body>
+
+  <table class="search">
+    <tbody>
+      <tr>
+        <th>Service Url</th>
+        <td><input type="text" class="service-url" value="" style="width: 600px" /></td>
+      </tr>
+      <tr>
+        <th>Patient Id</th>
+        <td><input type="number" class="patient-id" value="" style="width: 100px" /></td>
+      </tr>
+      <tr>
+        <th>&nbsp;</th>
+        <td><button class="patient-search">Search</button></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="shortcuts"></div>
+
+  <script src="https://cdn.rawgit.com/smart-on-fhir/client-js/v0.1.8/dist/fhir-client.js"></script>
+  <script type="text/javascript">
+    var patientScopes = [
+      // 'AllergyIntolerance',
+      // 'Appointment',
+      // 'Binary',
+      // 'Condition',
+      // 'Contract',
+      // 'Device',
+      // 'DiagnosticReport',
+      'Encounter',
+      // 'Immunization',
+      // 'MedicationOrder',
+      // 'MedicationStatement',
+      'Observation',
+      'Patient',
+      'Person',
+      'RelatedPerson'
+    ];
+
+    var shortcuts = [
+      { serviceUrl: 'https://fhir-open-api-dstu2.smarthealthit.org', patientId: 1557780 },
+      { serviceUrl: 'https://fhir-open.sandboxcerner.com/dstu2/0b8a0111-e8e6-4c26-a91c-5069cbc6b1ca', patientId: 4342010 },
+      { serviceUrl: 'https://fhir-open.sandboxcerner.com/dstu2/0b8a0111-e8e6-4c26-a91c-5069cbc6b1ca', patientId: 4342012 },
+      { serviceUrl: 'https://fhir-open.sandboxcerner.com/dstu2/0b8a0111-e8e6-4c26-a91c-5069cbc6b1ca', patientId: 4478007 },
+      { serviceUrl: 'https://fhir-open.sandboxcerner.com/dstu2/0b8a0111-e8e6-4c26-a91c-5069cbc6b1ca', patientId: 4342008 },
+      { serviceUrl: 'http://fhirtest.uhn.ca/baseDstu2', patientId: 2349 },
+    ];
+
+    function setupFhirClient() {
+      var client = {
+        serviceUrl: $('.service-url').val(),
+        patientId: $('.patient-id').val()
+      };
+
+      return FHIR.client(client);
+    }
+
+    function getPatient(smart) {
+      var deferred = $.Deferred(), fetch;
+
+      fetch = smart.patient.read();
+      fetch
+        .then(function(results) {
+          // $('.data-patient').text(JSON.stringify(results, undefined, 2));
+          console.log('getPatient', results);
+        })
+        .always(function() {
+          deferred.resolve();
+        });
+
+      return deferred.promise();
+    }
+
+    function getAllPatientScopes(smart) {
+      var deferred = $.Deferred(), fetches = [];
+
+      for (var i = 0; i < patientScopes.length; i++) {
+        (function(scope) {
+          var fetch = smart.patient.api.fetchAll({ type: scope });
+          fetches.push(fetch);
+          fetch.then(function(results) {
+            // 55284-4: Blood pressure systolic and diastolic [DISCOURAGED]
+            // 8480-6: Systolic blood pressure
+            // 8462-4: Diastolic blood pressure
+            // 75367002: Blood pressure (observable entity)
+            // 2345-7: Glucose SerPl-mCnc
+            // 2823-3: Potassium SerPl-sCnc
+            // 2823-3: POTASSIUM:SCNC:PT:SER/PLAS:QN
+            console.log(scope, results);
+            // if (scope === 'Binary') {
+            //   for (var i = 0; i < results.length; i++) {
+            //     console.log(results[i].contentType);
+            //     if (results[i].contentType === 'image/jpeg' || results[i].contentType === 'image/png') {
+            //       $('body').append('<img src="data:' + results[i].contentType + ';base64,' + results[i].content + '" />');
+            //     }
+            //   }
+            // }
+
+            if (scope === 'Observation') {
+              for (var i = 0, iEnd = results.length; i < iEnd; i++) {
+                var result = results[i];
+                var codeMatches = [];
+                var codeDisplay;
+
+                if (result.code) {
+                  if (result.code.coding) {
+                    for (var j = 0, jEnd = result.code.coding.length; j < jEnd; j++) {
+                      var coding = result.code.coding[j];
+                      if (coding && coding.display) {
+                        codeDisplay = coding.display.toLowerCase();
+
+                        if (
+                          // codeDisplay.indexOf('cholesterol') !== -1 ||
+                          codeDisplay.indexOf('blood') !== -1 ||
+                          codeDisplay.indexOf('glucose') !== -1 ||
+                          codeDisplay.indexOf('potassium') !== -1
+                        ) {
+                          codeMatches.push(coding.code + ' - ' + coding.display);
+                        }
+                      } else {
+                        console.log('skip Observation', i, j);
+                      }
+                    }
+                  } else if (result.code.text) {
+                    codeDisplay = result.code.text.toLowerCase();
+
+                    if (
+                      // codeDisplay.indexOf('cholesterol') !== -1 ||
+                      codeDisplay.indexOf('blood') !== -1 ||
+                      codeDisplay.indexOf('glucose') !== -1 ||
+                      codeDisplay.indexOf('potassium') !== -1
+                    ) {
+                      codeMatches.push(coding.code + ' - ' + coding.display);
+                    }
+                  } else {
+                    console.log('skip Observation', i);
+                  }
+                } else {
+                  console.log('skip Observation', i);
+                }
+
+                if (codeMatches.length) {
+                  var value = (result.valueQuantity) ? result.valueQuantity.value : '';
+                  var unit = (result.valueQuantity) ? result.valueQuantity.unit : '';
+                  console.log(codeMatches.join('; '), value, unit, result.effectiveDateTime, result);
+                }
+              }
+            }
+
+          });
+        })(patientScopes[i]);
+      }
+
+      $.when.apply(null, fetches).always(function() {
+        deferred.resolve();
+      });
+
+      return deferred.promise();
+    }
+
+    $(window).load(function() {
+      shortcutContainer = $('.shortcuts');
+      shortcuts.forEach(function(shortcut) {
+        var newEl = $(
+          '<div>' +
+          '  <a href="#" class="shortcut" data-service-url="' + shortcut.serviceUrl + '" data-patient-id="' + shortcut.patientId + '">' +
+          '    ' + shortcut.serviceUrl + ' - ' + shortcut.patientId +
+          '  </a>' +
+          '</div>'
+        );
+
+        shortcutContainer.append(newEl);
+      });
+
+      $('.shortcut').on('click', function() {
+        $('.service-url').val($(this).data('service-url'));
+        $('.patient-id').val($(this).data('patient-id'));
+        return false;
+      });
+
+      $('.patient-search').on('click', function() {
+        var thisEl = $(this),
+          smart = setupFhirClient();
+
+        thisEl.prop('disabled', 'disabled');
+
+        console.log('tokenResponse', smart);
+
+        $.when(
+          getPatient(smart),
+          getAllPatientScopes(smart)
+        ).always(function() {
+          thisEl.prop('disabled', '');
+        });
+      });
+    });
+
+  </script>
+</body>
 </html>
